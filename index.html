@@ -65,7 +65,7 @@ const WHATSAPP_NUMBER = "5521993763800";
 const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const MODO_TESTE = true;
-const VERSAO = "04/06/2026 às 23:55";
+const VERSAO = "05/06/2026 às 01:05";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -181,8 +181,8 @@ function StepModalidade({ data, setData, onNext }) {
           style={{ ...styles.cardSelect, borderColor: data.modalidade === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.modalidade === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, width: 64, justifyContent: "center" }}>
-                {op.imgs.map((src, i) => <img key={i} src={src} alt="" style={{ height: 52, width: "auto", objectFit: "contain", maxWidth: op.imgs.length > 1 ? 32 : 56 }} />)}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, width: 72, justifyContent: "center" }}>
+                {op.imgs.map((src, i) => <img key={i} src={src} alt="" style={{ height: op.imgs.length > 1 ? 40 : 56, width: "auto", objectFit: "contain" }} />)}
               </div>
               <div>
                 <div style={{ fontWeight: 700, color: C.cinzaTexto, fontSize: 16, fontFamily: "'Poppins', sans-serif" }}>{op.titulo}</div>
