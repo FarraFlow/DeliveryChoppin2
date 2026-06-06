@@ -10,7 +10,7 @@
 <meta property="og:image" content="https://farraflow.github.io/DeliveryChoppin/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:url" content="https://farraflow.github.io/DeliveryChoppin/">
+<meta property="og:url" content="https://deliverychoppin.com.br/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://farraflow.github.io/DeliveryChoppin/og-image.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -65,7 +65,7 @@ const WHATSAPP_NUMBER = "5521993763800";
 const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const MODO_TESTE = true;
-const VERSAO = "05/06/2026 às 01:10";
+const VERSAO = "05/06/2026 às 11:30";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -86,8 +86,7 @@ function calcTotais(data) {
     const aluguel = data.chopeira ? ALUGUEL_CHOPEIRA[data.chopeira] : 0;
     const numDiarias = data.diarias || 1;
     const adicionalDiarias = (numDiarias - 1) * CUSTO_DIARIA_ADICIONAL;
-    const temDedicada = data.entrega === "dedicada" || data.recolha === "dedicada";
-    const adicionalDedicada = temDedicada ? CUSTO_DEDICADA : 0;
+    const adicionalDedicada = (data.entrega === "dedicada" ? CUSTO_DEDICADA : 0) + (data.recolha === "dedicada" ? CUSTO_DEDICADA : 0);
     const total = aluguel + adicionalDiarias + adicionalDedicada;
     return { subtotal: aluguel, desconto: 0, adicionalEletrica: 0, adicionalDedicada, adicionalDiarias, adicionalCopos: 0, tirasExtras: 0, tirasGratis: 0, aluguel, total, qtdBarris: 0, numDiarias };
   }
@@ -96,8 +95,7 @@ function calcTotais(data) {
   const desconto = qtdBarris > 1 ? (qtdBarris - 1) * DESCONTO_POR_BARRIL : 0;
   // chopeira elétrica só no delivery completo
   const adicionalEletrica = (modalidade === "delivery" && data.chopeira === "eletrica") ? 50 : 0;
-  const temDedicada = data.entrega === "dedicada" || data.recolha === "dedicada";
-  const adicionalDedicada = temDedicada ? CUSTO_DEDICADA : 0;
+  const adicionalDedicada = (data.entrega === "dedicada" ? CUSTO_DEDICADA : 0) + (data.recolha === "dedicada" ? CUSTO_DEDICADA : 0);
   const numDiarias = data.diarias || 1;
   const adicionalDiarias = (numDiarias - 1) * CUSTO_DIARIA_ADICIONAL;
   // copos grátis só no delivery completo
@@ -604,10 +602,8 @@ function StepEntrega({ data, setData, onNext, onBack }) {
 
   function OpcaoCard({ campo, op }) {
     const sel = data[campo] === op.id;
-    const outro = campo === "entrega" ? "recolha" : "entrega";
-    const outraDedicada = data[outro] === "dedicada";
-    const badge = op.id === "dedicada" ? (outraDedicada ? "Incluso na taxa" : "+ " + formatMoney(CUSTO_DEDICADA)) : "Incluso";
-    const badgeColor = op.id === "dedicada" && !outraDedicada ? C.dourado : C.verde;
+    const badge = op.id === "dedicada" ? "+ " + formatMoney(CUSTO_DEDICADA) : "Incluso";
+    const badgeColor = op.id === "dedicada" ? C.dourado : C.verde;
     return (
       <div onClick={() => setData(d => ({ ...d, [campo]: op.id, ...(op.id === "compartilhada" ? (campo === "entrega" ? { horaEntrega: undefined } : { horaRecolha: undefined }) : {}) }))}
         style={{ ...styles.cardSelect, padding: "12px 14px", borderColor: sel ? C.vermelho : "rgba(0,0,0,0.08)", background: sel ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
@@ -631,7 +627,7 @@ function StepEntrega({ data, setData, onNext, onBack }) {
   return (
     <div>
       <h2 style={styles.stepTitle}>Entrega e Recolha 🚚</h2>
-      <p style={styles.stepSub}>Por padrão, as entregas e recolhas são realizadas conforme abaixo:<br/><br/><b>Entregas:</b> são feitas no dia do evento em rotas compartilhadas que iniciam às 8h da manhã até 1h antes do evento começar.<br/><br/><b>Recolhas:</b> são realizadas no dia seguinte, também em rotas compartilhadas com início às 8h da manhã.<br/><br/><b>Entrega/Recolha dedicada:</b> Taxa de entrega de R$ 150 cobrada uma única vez.</p>
+      <p style={styles.stepSub}>Por padrão, as entregas e recolhas são realizadas conforme abaixo:<br/><br/><b>Entregas:</b> são feitas no dia do evento em rotas compartilhadas que iniciam às 8h da manhã até 1h antes do evento começar.<br/><br/><b>Recolhas:</b> são realizadas no dia seguinte, também em rotas compartilhadas com início às 8h da manhã.<br/><br/><b>Entrega/Recolha dedicada:</b> Taxa de R$ 150 cobrada para cada (entrega e recolha).</p>
       <p style={styles.groupLabel}>Tipo de entrega</p>
       <OpcaoCard campo="entrega" op={{ id: "compartilhada", label: "Compartilhada", desc: "Rota com outros pedidos.", icon: "🔄" }} />
       <OpcaoCard campo="entrega" op={{ id: "dedicada", label: "Dedicada", desc: "Motorista exclusivo, horário definido por você.", icon: "🎯" }} />
@@ -811,7 +807,7 @@ function StepResumo({ data, onBack }) {
   msgBody += "*EVENTO*\nData: " + dataEvento + "\nHorario: " + data.hora + "h\nDiarias: " + t.numDiarias + (t.adicionalDiarias > 0 ? " (+" + formatMoney(t.adicionalDiarias) + ")" : "") + "\n";
   msgBody += "Entrega: " + (data.entrega === "dedicada" ? "Dedicada as " + data.horaEntrega + "h" : "Compartilhada") + "\n";
   msgBody += "Recolha: " + (data.recolha === "dedicada" ? "Dedicada as " + data.horaRecolha + "h" : "Compartilhada") + " - " + dataRecolha + "\n";
-  if (t.adicionalDedicada > 0) msgBody += "Taxa dedicada: + " + formatMoney(t.adicionalDedicada) + " (1x)\n";
+  if (t.adicionalDedicada > 0) msgBody += "Taxa dedicada: + " + formatMoney(t.adicionalDedicada) + "\n";
   msgBody += "\n*ENDERECO DO EVENTO*\nEndereco: " + data.rua + ", " + data.numero + "\nBairro: " + data.bairro + "\nCidade: " + cidadeUf + (data.complemento ? "\nComplemento: " + data.complemento : "") + "\n";
   if (data.cepDisplay) msgBody += "CEP: " + data.cepDisplay + "\n";
   if (data.eventoOutraPessoa && data.moradorNome) msgBody += "Responsavel no local: " + data.moradorNome + (data.moradorTel ? "\nTelefone: " + data.moradorTel : "") + "\n";
@@ -845,7 +841,7 @@ function StepResumo({ data, onBack }) {
           {modalidade === "delivery" && <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}><span style={{ color: C.verde, display: "flex", alignItems: "center", gap: 6 }}><img src={IMG_COPOS} alt="" style={{ width: 14, height: 18, objectFit: "contain" }} />{t.tirasGratis} tira(s) grátis</span><span style={{ color: C.verde, fontWeight: 700 }}>{t.tirasGratis * 50} un</span></div>}
           {t.tirasExtras > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: C.cinzaClaro }}>Copos extras ({t.tirasExtras}x)</span><span style={{ color: C.cinzaTexto }}>+ {formatMoney(t.adicionalCopos)}</span></div>}
           {t.adicionalEletrica > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: C.cinzaClaro }}>⚡ Chopeira elétrica</span><span style={{ color: C.cinzaTexto }}>+ {formatMoney(t.adicionalEletrica)}</span></div>}
-          {t.adicionalDedicada > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: C.cinzaClaro }}>🎯 Taxa dedicada (1x)</span><span style={{ color: C.cinzaTexto }}>+ {formatMoney(t.adicionalDedicada)}</span></div>}
+          {t.adicionalDedicada > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: C.cinzaClaro }}>🎯 Taxa dedicada</span><span style={{ color: C.cinzaTexto }}>+ {formatMoney(t.adicionalDedicada)}</span></div>}
           {t.adicionalDiarias > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: C.cinzaClaro }}>📆 Diárias adicionais</span><span style={{ color: C.cinzaTexto }}>+ {formatMoney(t.adicionalDiarias)}</span></div>}
           <Divider />
         </>}
@@ -855,7 +851,7 @@ function StepResumo({ data, onBack }) {
           <Row label="Tipo" value={chopeiraNome} />
           {modalidade === "so-chopeira" && <Row label="Aluguel" value={formatMoney(t.aluguel)} />}
           {modalidade === "so-chopeira" && data.litrosChopp && <Row label="Qtd. de chopp" value={data.litrosChopp + " L"} />}
-          {modalidade === "so-chopeira" && t.adicionalDedicada > 0 && <Row label="🎯 Taxa dedicada (1x)" value={"+ " + formatMoney(t.adicionalDedicada)} />}
+          {modalidade === "so-chopeira" && t.adicionalDedicada > 0 && <Row label="🎯 Taxa dedicada" value={"+ " + formatMoney(t.adicionalDedicada)} />}
           {modalidade === "so-chopeira" && t.adicionalDiarias > 0 && <Row label="📆 Diárias adicionais" value={"+ " + formatMoney(t.adicionalDiarias)} />}
           <Divider />
         </>}
