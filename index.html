@@ -818,6 +818,28 @@ function StepResumo({ data, onBack }) {
 
   const whatsappUrl = "https://api.whatsapp.com/send?phone=" + WHATSAPP_NUMBER + "&text=" + encodeURIComponent(msgBody);
 
+  const PLANILHA_URL = "https://script.google.com/macros/s/AKfycbwFhijmsXpGfHS3_a2gNOOui74XUEBNjrk0idS7VaZw1k3vN8sYMYBbYamT2oNTjsp8-Q/exec";
+  const NOME_VENDEDOR = "Vendedor 2";
+  function registrarPedido() {
+    try {
+      var itensStr = barris.map(function(b){ return b.qtd + "x " + b.nome + " " + b.litros + "L"; }).join(", ");
+      var payload = {
+        vendedor: NOME_VENDEDOR,
+        modalidade: modNome,
+        cliente: data.nome || "",
+        whatsapp: data.telefone || "",
+        itens: modalidade === "so-chopeira" ? ("Aluguel " + (chopeiraNome||"")) : itensStr,
+        litros: modalidade === "so-chopeira" ? (data.litrosChopp || "") : totalLitros,
+        valorTotal: formatMoney(t.total),
+        pagamento: pagamentoTxt,
+        endereco: (data.rua||"") + (data.numero ? ", " + data.numero : "") + " - " + (data.bairro||"") + " - " + cidadeUf,
+        dataEvento: dataEvento,
+        observacoes: data.obsInstalacao || ""
+      };
+      fetch(PLANILHA_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+    } catch (e) { /* nao bloqueia o pedido se a planilha falhar */ }
+  }
+
   return (
     <div>
       <h2 style={styles.stepTitle}>Resumo do Pedido ✅</h2>
@@ -893,11 +915,9 @@ function StepResumo({ data, onBack }) {
         </div>
         {t.desconto > 0 && <p style={{ fontSize: 11, color: C.verde, marginTop: 6 }}>🎁 Você economizou {formatMoney(t.desconto)}</p>}
       </div>
-      <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-        <button style={{ ...styles.btnPrimary, marginTop: 20, background: "#25D366", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <span style={{ fontSize: 22 }}>💬</span> Confirmar no WhatsApp
-        </button>
-      </a>
+      <button onClick={() => { registrarPedido(); window.open(whatsappUrl, "_blank"); }} style={{ ...styles.btnPrimary, marginTop: 20, background: "#25D366", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%" }}>
+        <span style={{ fontSize: 22 }}>💬</span> Confirmar no WhatsApp
+      </button>
       <button onClick={onBack} style={{ ...styles.btnSecondary, marginTop: 16 }}>← Editar pedido</button>
       <p style={{ fontSize: 11, color: C.cinzaClaro, textAlign: "center", marginTop: 16 }}>Você será redirecionado ao WhatsApp. O pagamento é combinado diretamente com nossa equipe.</p>
     </div>
