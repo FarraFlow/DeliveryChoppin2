@@ -65,7 +65,7 @@ const WHATSAPP_NUMBER = "5521993763800";
 const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const MODO_TESTE = false;
-const VERSAO = "08/06/2026 às 00:12";
+const VERSAO = "08/06/2026 às 00:19";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -226,7 +226,7 @@ function StepBarris({ data, setData, onNext, onBack }) {
   return (
     <div>
       <h2 style={styles.stepTitle}>Monte seu pedido 🍺</h2>
-      <p style={styles.stepSub}>{ehDelivery ? "Escolha os estilos e quantidades" : "Somente o barril — R$ 100 mais barato por unidade"}</p>
+      <p style={styles.stepSub}>Escolha os estilos e quantidades</p>
       {qtdBarris >= 2 && (
         <div style={{ background: "rgba(46,158,91,0.1)", border: "1.5px solid "+C.verde+"55", borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 18 }}>🎁</span>
