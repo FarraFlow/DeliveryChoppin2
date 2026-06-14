@@ -67,7 +67,7 @@ const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const DISPONIBILIDADE_URL = "https://script.google.com/macros/s/AKfycbwFhijmsXpGfHS3_a2gNOOui74XUEBNjrk0idS7VaZw1k3vN8sYMYBbYamT2oNTjsp8-Q/exec";
 const MODO_TESTE = false;
-const VERSAO = "14/06/2026 às 17:49";
+const VERSAO = "14/06/2026 às 18:38";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -311,8 +311,9 @@ function StepBarris({ data, setData, onNext, onBack, disp }) {
                 const opIndisp = itemIndisponivel(disp, data.data, c.nome, op.litros + "L");
                 if (opIndisp) {
                   return (
-                    <div key={op.litros} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: C.vermelho, borderRadius: 10, padding: "6px 12px", border: "1.5px solid "+C.vermelho }}>
-                      <span style={{ fontSize: 11, color: "#fff", fontWeight: 800, letterSpacing: 0.5 }}>INDISPONÍVEL</span>
+                    <div key={op.litros} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.03)", borderRadius: 10, padding: "6px 10px", border: "1.5px solid transparent" }}>
+                      <span style={{ fontSize: 12, color: C.cinzaTexto, fontWeight: 600 }}>{op.litros}L</span>
+                      <span style={{ fontSize: 9, fontWeight: 800, background: C.vermelho, color: "#fff", borderRadius: 4, padding: "2px 7px", letterSpacing: 0.5 }}>INDISPONÍVEL</span>
                     </div>
                   );
                 }
@@ -446,7 +447,7 @@ function StepChopeira({ data, setData, onNext, onBack, disp }) {
               const tIndisp = t === "110v" ? v110Indisp : v220Indisp;
               return (
               <button key={t} onClick={() => { if (tIndisp) return; setData(d => ({ ...d, tensao: t })); }} disabled={tIndisp}
-                style={{ ...styles.litroBtn, flex: 1, cursor: tIndisp ? "not-allowed" : "pointer", opacity: 1, textDecoration: "none", background: tIndisp ? C.vermelho : (data.tensao === t ? C.vermelho : "rgba(0,0,0,0.05)"), color: tIndisp ? "#fff" : (data.tensao === t ? "#fff" : C.cinzaTexto), fontWeight: tIndisp ? 800 : (data.tensao === t ? 700 : 500), fontSize: tIndisp ? 11 : 15, letterSpacing: tIndisp ? 0.5 : 0 }}>{tIndisp ? "INDISPONÍVEL" : t.toUpperCase()}</button>
+                style={{ ...styles.litroBtn, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: tIndisp ? "not-allowed" : "pointer", opacity: tIndisp ? 0.85 : 1, background: data.tensao === t ? C.vermelho : "rgba(0,0,0,0.05)", color: data.tensao === t ? "#fff" : C.cinzaTexto, fontWeight: data.tensao === t ? 700 : 500, fontSize: 15 }}>{t.toUpperCase()}{tIndisp && <span style={{ fontSize: 9, fontWeight: 800, background: C.vermelho, color: "#fff", borderRadius: 4, padding: "2px 6px", letterSpacing: 0.5 }}>INDISPONÍVEL</span>}</button>
               );
             })}
           </div>
@@ -509,7 +510,7 @@ function StepAluguelChopeira({ data, setData, onNext, onBack, disp }) {
               const tIndisp = t === "110v" ? v110Indisp : v220Indisp;
               return (
               <button key={t} onClick={() => { if (tIndisp) return; setData(d => ({ ...d, tensao: t })); }} disabled={tIndisp}
-                style={{ ...styles.litroBtn, flex: 1, cursor: tIndisp ? "not-allowed" : "pointer", opacity: 1, textDecoration: "none", background: tIndisp ? C.vermelho : (data.tensao === t ? C.vermelho : "rgba(0,0,0,0.05)"), color: tIndisp ? "#fff" : (data.tensao === t ? "#fff" : C.cinzaTexto), fontWeight: tIndisp ? 800 : (data.tensao === t ? 700 : 500), fontSize: tIndisp ? 11 : 15, letterSpacing: tIndisp ? 0.5 : 0 }}>{tIndisp ? "INDISPONÍVEL" : t.toUpperCase()}</button>
+                style={{ ...styles.litroBtn, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: tIndisp ? "not-allowed" : "pointer", opacity: tIndisp ? 0.85 : 1, background: data.tensao === t ? C.vermelho : "rgba(0,0,0,0.05)", color: data.tensao === t ? "#fff" : C.cinzaTexto, fontWeight: data.tensao === t ? 700 : 500, fontSize: 15 }}>{t.toUpperCase()}{tIndisp && <span style={{ fontSize: 9, fontWeight: 800, background: C.vermelho, color: "#fff", borderRadius: 4, padding: "2px 6px", letterSpacing: 0.5 }}>INDISPONÍVEL</span>}</button>
               );
             })}
           </div>
