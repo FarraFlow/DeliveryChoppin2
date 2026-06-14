@@ -67,7 +67,7 @@ const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const DISPONIBILIDADE_URL = "https://script.google.com/macros/s/AKfycbwFhijmsXpGfHS3_a2gNOOui74XUEBNjrk0idS7VaZw1k3vN8sYMYBbYamT2oNTjsp8-Q/exec";
 const MODO_TESTE = false;
-const VERSAO = "14/06/2026 às 12:30";
+const VERSAO = "14/06/2026 às 12:42";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -965,7 +965,7 @@ function StepData({ data, setData, onNext, disp }) {
       <label style={styles.label}>Data do evento</label>
       <input type="date" value={data.data || ""} onChange={setDataEvento} style={{ ...styles.input, minHeight: 46, height: 46, lineHeight: "20px", display: "block", WebkitAppearance: "none", appearance: "none", textAlign: "left", textAlignLast: "left" }} min={hojeStr} />
       {dataPassada && <p style={{ fontSize: 11, color: C.vermelho, marginTop: 6 }}>A data do evento não pode ser anterior a hoje.</p>}
-      {dataBloqueada && <p style={{ fontSize: 12, color: C.vermelho, marginTop: 8, fontWeight: 600 }}>😕 Não estamos atendendo nesta data. Por favor, escolha outro dia.</p>}
+      {dataBloqueada && <p style={{ fontSize: 12, color: C.vermelho, marginTop: 8, fontWeight: 600 }}>😕 Não temos mais disponibilidade nesta data. Por favor, escolha outra.</p>}
       <div style={{ marginTop: 24 }}>
         <button onClick={onNext} disabled={!MODO_TESTE && !ok} style={{ ...styles.btnPrimary, opacity: (MODO_TESTE || ok) ? 1 : 0.4 }}>Continuar →</button>
       </div>
