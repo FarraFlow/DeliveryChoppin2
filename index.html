@@ -67,7 +67,7 @@ const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const DISPONIBILIDADE_URL = "https://script.google.com/macros/s/AKfycbwFhijmsXpGfHS3_a2gNOOui74XUEBNjrk0idS7VaZw1k3vN8sYMYBbYamT2oNTjsp8-Q/exec";
 const MODO_TESTE = false;
-const VERSAO = "14/06/2026 às 12:42";
+const VERSAO = "14/06/2026 às 13:17";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -90,6 +90,23 @@ function normalizarDataBloqueio(v) {
   var mBr = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   if (mBr) return mBr[3] + "-" + mBr[2] + "-" + mBr[1];
   return s;
+}
+
+// Normaliza tamanho de barril para comparação ("30L", "30 l", "30" => "30L"-ish, sem espaços/maiúsculo).
+function normTam(v) { return String(v == null ? "" : v).replace(/\s+/g, "").toUpperCase(); }
+
+// Item indisponível na data escolhida?
+// produto = nome exato da coluna "Produto" da planilha; tamanho = coluna "Barril" ("30L"...) ou "" p/ chopeiras.
+function itemIndisponivel(disp, dataEscolhida, produto, tamanho) {
+  if (!disp || !disp.indisponiveis || !dataEscolhida) return false;
+  var prodAlvo = String(produto || "").trim();
+  var temTamanho = tamanho != null && tamanho !== "";
+  return disp.indisponiveis.some(function (it) {
+    if (!it) return false;
+    if (String(it.produto || "").trim() !== prodAlvo) return false;
+    if (temTamanho && normTam(it.barril) !== normTam(tamanho)) return false;
+    return normalizarDataBloqueio(it.data) === dataEscolhida;
+  });
 }
 
 // ajusta preço conforme modalidade
@@ -185,7 +202,12 @@ function ProgressBar({ step, total }) {
 }
 
 // ─── STEP 0: Escolha da modalidade ───────────────────────────────────────────
-function StepModalidade({ data, setData, onNext, onBack }) {
+function StepModalidade({ data, setData, onNext, onBack, disp }) {
+  // Sem nenhuma chopeira disponível na data => Delivery e Aluguel indisponíveis (só "Somente Barril").
+  const semChopeira =
+    itemIndisponivel(disp, data.data, "Chopeira a Gelo", "") &&
+    itemIndisponivel(disp, data.data, "Chopeira Elétrica 110v", "") &&
+    itemIndisponivel(disp, data.data, "Chopeira Elétrica 220v", "");
   const opcoes = [
     { id: "delivery", titulo: "Delivery Completo", imgs: [{ src: IMG_CHOPEIRA_GELO, h: 38 }, { src: IMG_BARRIL_CHOPPIN, h: 50 }], desc: "Barril + chopeira + cilindro de CO² + copos plásticos de brinde. Tudo pronto para o seu evento." },
     { id: "so-barril", titulo: "Somente Barril", imgs: [{ src: IMG_BARRIL_CHOPPIN, h: 56 }], desc: "Para quem já tem chopeira. Inclui apenas o barril (não acompanha chopeira, cilindro de CO² nem copos)." },
@@ -195,23 +217,29 @@ function StepModalidade({ data, setData, onNext, onBack }) {
     <div>
       <h2 style={styles.stepTitle}>O que você precisa?</h2>
       <p style={styles.stepSub}>Escolha a modalidade do seu pedido</p>
-      {opcoes.map(op => (
-        <div key={op.id} onClick={() => { setData(d => d.modalidade === op.id ? d : { data: d.data, modalidade: op.id }); }}
-          style={{ ...styles.cardSelect, borderColor: data.modalidade === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.modalidade === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
+      {opcoes.map(op => {
+        const indisp = semChopeira && (op.id === "delivery" || op.id === "so-chopeira");
+        return (
+        <div key={op.id} onClick={() => { if (indisp) return; setData(d => d.modalidade === op.id ? d : { data: d.data, modalidade: op.id }); }}
+          style={{ ...styles.cardSelect, cursor: indisp ? "not-allowed" : "pointer", opacity: indisp ? 0.55 : 1, borderColor: data.modalidade === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.modalidade === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, width: 72, justifyContent: "center" }}>
-                {op.imgs.map((im, i) => <img key={i} src={im.src} alt="" style={{ height: im.h, width: "auto", objectFit: "contain" }} />)}
+                {op.imgs.map((im, i) => <img key={i} src={im.src} alt="" style={{ height: im.h, width: "auto", objectFit: "contain", filter: indisp ? "grayscale(1)" : "none" }} />)}
               </div>
               <div>
-                <div style={{ fontWeight: 700, color: C.cinzaTexto, fontSize: 16, fontFamily: "'Poppins', sans-serif" }}>{op.titulo}</div>
-                <div style={{ fontSize: 12.5, color: C.cinzaClaro, marginTop: 4, lineHeight: 1.4 }}>{op.desc}</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 700, color: C.cinzaTexto, fontSize: 16, fontFamily: "'Poppins', sans-serif" }}>{op.titulo}</span>
+                  {indisp && <span style={{ fontSize: 9, fontWeight: 800, background: C.cinzaClaro, color: "#fff", borderRadius: 4, padding: "2px 7px", letterSpacing: 0.5 }}>INDISPONÍVEL</span>}
+                </div>
+                <div style={{ fontSize: 12.5, color: C.cinzaClaro, marginTop: 4, lineHeight: 1.4 }}>{indisp ? "Sem chopeira disponível para esta data." : op.desc}</div>
               </div>
             </div>
             {data.modalidade === op.id && <span style={{ color: C.vermelho, fontSize: 20 }}>✓</span>}
           </div>
         </div>
-      ))}
+        );
+      })}
       <div style={styles.btnRow}>
         <button onClick={onBack} style={styles.btnSecondary}>← Voltar</button>
         <button onClick={onNext} disabled={!MODO_TESTE && !data.modalidade} style={{ ...styles.btnPrimary, opacity: (MODO_TESTE || data.modalidade) ? 1 : 0.4 }}>Continuar →</button>
@@ -222,7 +250,7 @@ function StepModalidade({ data, setData, onNext, onBack }) {
 }
 
 // ─── Seleção de barris (delivery e só-barril) ────────────────────────────────
-function StepBarris({ data, setData, onNext, onBack }) {
+function StepBarris({ data, setData, onNext, onBack, disp }) {
   const barris = data.barris || [];
   const modalidade = data.modalidade;
   function addBarril(choppId, litros) {
@@ -258,14 +286,18 @@ function StepBarris({ data, setData, onNext, onBack }) {
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {CHOPPS.map(c => (
-          <div key={c.id} style={{ ...styles.card, border: "1.5px solid rgba(0,0,0,0.08)", background: "#fff" }}>
+        {CHOPPS.map(c => {
+          const todosIndisp = c.opcoes.every(op => itemIndisponivel(disp, data.data, c.nome, op.litros + "L"));
+          return (
+          <div key={c.id} style={{ ...styles.card, border: "1.5px solid rgba(0,0,0,0.08)", background: "#fff", opacity: todosIndisp ? 0.6 : 1 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
-              <img src={c.img} alt={c.nome} style={{ width: 44, height: 56, objectFit: "contain", flexShrink: 0 }} />
+              <img src={c.img} alt={c.nome} style={{ width: 44, height: 56, objectFit: "contain", flexShrink: 0, filter: todosIndisp ? "grayscale(1)" : "none" }} />
               <div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, color: C.cinzaTexto, fontSize: 15 }}>{c.nome}</span>
-                  <span style={{ fontSize: 9, fontWeight: 800, background: c.cor, color: "#fff", borderRadius: 4, padding: "2px 6px", letterSpacing: 0.5 }}>{c.tag}</span>
+                  {todosIndisp
+                    ? <span style={{ fontSize: 9, fontWeight: 800, background: C.cinzaClaro, color: "#fff", borderRadius: 4, padding: "2px 6px", letterSpacing: 0.5 }}>ESGOTADO P/ ESTA DATA</span>
+                    : <span style={{ fontSize: 9, fontWeight: 800, background: c.cor, color: "#fff", borderRadius: 4, padding: "2px 6px", letterSpacing: 0.5 }}>{c.tag}</span>}
                 </div>
                 <p style={{ margin: "2px 0 0", fontSize: 11, color: C.cinzaClaro }}>{c.descricao}</p>
                 <p style={{ margin: "2px 0 0", fontSize: 11, color: c.cor, fontWeight: 700 }}>Teor alcoólico: {c.teor}</p>
@@ -276,6 +308,15 @@ function StepBarris({ data, setData, onNext, onBack }) {
                 const idx = barris.findIndex(b => b.choppId === c.id && b.litros === op.litros);
                 const qtd = idx >= 0 ? barris[idx].qtd : 0;
                 const precoMostrar = precoBarril(op.preco, modalidade);
+                const opIndisp = itemIndisponivel(disp, data.data, c.nome, op.litros + "L");
+                if (opIndisp) {
+                  return (
+                    <div key={op.litros} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.03)", borderRadius: 10, padding: "6px 10px", border: "1.5px dashed rgba(0,0,0,0.15)", opacity: 0.7 }}>
+                      <span style={{ fontSize: 12, color: C.cinzaClaro, fontWeight: 600, textDecoration: "line-through" }}>{op.litros}L</span>
+                      <span style={{ fontSize: 11, color: C.cinzaClaro, fontWeight: 700 }}>✕ Indisponível</span>
+                    </div>
+                  );
+                }
                 return (
                   <div key={op.litros} style={{ display: "flex", alignItems: "center", gap: 6, background: qtd > 0 ? "rgba("+hexToRgb(c.cor)+",0.12)" : "rgba(0,0,0,0.03)", borderRadius: 10, padding: "6px 10px", border: qtd > 0 ? "1.5px solid "+c.cor : "1.5px solid transparent" }}>
                     <span style={{ fontSize: 12, color: C.cinzaTexto, fontWeight: 600 }}>{op.litros}L</span>
@@ -294,7 +335,8 @@ function StepBarris({ data, setData, onNext, onBack }) {
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {ehDelivery && barris.length > 0 && (
@@ -358,8 +400,12 @@ function StepBarris({ data, setData, onNext, onBack }) {
 }
 
 // ─── STEP: Chopeira (delivery) ───────────────────────────────────────────────
-function StepChopeira({ data, setData, onNext, onBack }) {
+function StepChopeira({ data, setData, onNext, onBack, disp }) {
   const { total } = calcTotais(data);
+  const geloIndisp = itemIndisponivel(disp, data.data, "Chopeira a Gelo", "");
+  const v110Indisp = itemIndisponivel(disp, data.data, "Chopeira Elétrica 110v", "");
+  const v220Indisp = itemIndisponivel(disp, data.data, "Chopeira Elétrica 220v", "");
+  const eletricaIndisp = v110Indisp && v220Indisp;
   const opcoes = [
     { id: "gelo", label: "Chopeira a Gelo", desc: "Clássica e econômica, sem necessidade de tomada.", img: IMG_CHOPEIRA_GELO, recomendada: true, extra: "", aviso: "Importante: o gelo não é fornecido. Fica por conta do cliente." },
     { id: "eletrica", label: "Chopeira Elétrica", desc: "Mais prática, requer tomada disponível no local.", img: IMG_CHOPEIRA_ELETRICA, recomendada: false, extra: "+ R$ 50,00 (sujeito à disponibilidade)" },
@@ -368,34 +414,42 @@ function StepChopeira({ data, setData, onNext, onBack }) {
     <div>
       <h2 style={styles.stepTitle}>Escolha sua Chopeira</h2>
       <p style={styles.stepSub}>{" "}</p>
-      {opcoes.map(op => (
-        <div key={op.id} onClick={() => setData(d => ({ ...d, chopeira: op.id, tensao: op.id === "gelo" ? null : d.tensao }))}
-          style={{ ...styles.cardSelect, borderColor: data.chopeira === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.chopeira === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
+      {opcoes.map(op => {
+        const opIndisp = op.id === "gelo" ? geloIndisp : eletricaIndisp;
+        return (
+        <div key={op.id} onClick={() => { if (opIndisp) return; setData(d => ({ ...d, chopeira: op.id, tensao: op.id === "gelo" ? null : d.tensao })); }}
+          style={{ ...styles.cardSelect, cursor: opIndisp ? "not-allowed" : "pointer", opacity: opIndisp ? 0.55 : 1, borderColor: data.chopeira === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.chopeira === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <img src={op.img} alt={op.label} style={{ width: 64, height: 64, objectFit: "contain", flexShrink: 0 }} />
+              <img src={op.img} alt={op.label} style={{ width: 64, height: 64, objectFit: "contain", flexShrink: 0, filter: opIndisp ? "grayscale(1)" : "none" }} />
               <div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 700, color: C.cinzaTexto, fontSize: 15 }}>{op.label}</span>
-                  {op.recomendada && <span style={{ fontSize: 9, fontWeight: 800, background: C.verde, color: "#fff", borderRadius: 4, padding: "2px 7px", letterSpacing: 0.5 }}>RECOMENDADA</span>}
+                  {opIndisp
+                    ? <span style={{ fontSize: 9, fontWeight: 800, background: C.cinzaClaro, color: "#fff", borderRadius: 4, padding: "2px 7px", letterSpacing: 0.5 }}>INDISPONÍVEL</span>
+                    : (op.recomendada && <span style={{ fontSize: 9, fontWeight: 800, background: C.verde, color: "#fff", borderRadius: 4, padding: "2px 7px", letterSpacing: 0.5 }}>RECOMENDADA</span>)}
                 </div>
                 <div style={{ fontSize: 12, color: C.cinzaClaro, marginTop: 3 }}>{op.desc}</div>
-                {op.extra && <div style={{ fontSize: 11, color: C.vermelho, marginTop: 3, fontWeight: 600 }}>{op.extra}</div>}
-                {op.aviso && <div style={{ fontSize: 11, color: C.dourado, marginTop: 4, fontWeight: 700 }}>{op.aviso}</div>}
+                {!opIndisp && op.extra && <div style={{ fontSize: 11, color: C.vermelho, marginTop: 3, fontWeight: 600 }}>{op.extra}</div>}
+                {!opIndisp && op.aviso && <div style={{ fontSize: 11, color: C.dourado, marginTop: 4, fontWeight: 700 }}>{op.aviso}</div>}
               </div>
             </div>
             {data.chopeira === op.id && <span style={{ color: C.vermelho, fontSize: 20 }}>✓</span>}
           </div>
         </div>
-      ))}
+        );
+      })}
       {data.chopeira === "eletrica" && (
         <div style={{ marginTop: 8 }}>
           <p style={{ ...styles.label, marginTop: 0 }}>Tensão disponível no local:</p>
           <div style={{ display: "flex", gap: 10 }}>
-            {["110v", "220v"].map(t => (
-              <button key={t} onClick={() => setData(d => ({ ...d, tensao: t }))}
-                style={{ ...styles.litroBtn, flex: 1, background: data.tensao === t ? C.vermelho : "rgba(0,0,0,0.05)", color: data.tensao === t ? "#fff" : C.cinzaTexto, fontWeight: data.tensao === t ? 700 : 500, fontSize: 15 }}>{t.toUpperCase()}</button>
-            ))}
+            {["110v", "220v"].map(t => {
+              const tIndisp = t === "110v" ? v110Indisp : v220Indisp;
+              return (
+              <button key={t} onClick={() => { if (tIndisp) return; setData(d => ({ ...d, tensao: t })); }} disabled={tIndisp}
+                style={{ ...styles.litroBtn, flex: 1, cursor: tIndisp ? "not-allowed" : "pointer", opacity: tIndisp ? 0.5 : 1, textDecoration: tIndisp ? "line-through" : "none", background: data.tensao === t ? C.vermelho : "rgba(0,0,0,0.05)", color: data.tensao === t ? "#fff" : C.cinzaTexto, fontWeight: data.tensao === t ? 700 : 500, fontSize: 15 }}>{t.toUpperCase()}{tIndisp ? " ✕" : ""}</button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -410,7 +464,11 @@ function StepChopeira({ data, setData, onNext, onBack }) {
 }
 
 // ─── STEP: Aluguel de chopeira (modalidade so-chopeira) ──────────────────────
-function StepAluguelChopeira({ data, setData, onNext, onBack }) {
+function StepAluguelChopeira({ data, setData, onNext, onBack, disp }) {
+  const geloIndisp = itemIndisponivel(disp, data.data, "Chopeira a Gelo", "");
+  const v110Indisp = itemIndisponivel(disp, data.data, "Chopeira Elétrica 110v", "");
+  const v220Indisp = itemIndisponivel(disp, data.data, "Chopeira Elétrica 220v", "");
+  const eletricaIndisp = v110Indisp && v220Indisp;
   const opcoes = [
     { id: "gelo", label: "Chopeira a Gelo", desc: "Clássica e econômica, sem necessidade de tomada.", img: IMG_CHOPEIRA_GELO, recomendada: true, preco: ALUGUEL_CHOPEIRA.gelo, aviso: "Importante: o gelo não é fornecido. Fica por conta do cliente." },
     { id: "eletrica", label: "Chopeira Elétrica", desc: "Mais prática, requer tomada disponível no local.", img: IMG_CHOPEIRA_ELETRICA, recomendada: false, preco: ALUGUEL_CHOPEIRA.eletrica },
@@ -419,34 +477,42 @@ function StepAluguelChopeira({ data, setData, onNext, onBack }) {
     <div>
       <h2 style={styles.stepTitle}>Escolha sua Chopeira</h2>
       <p style={styles.stepSub}>Aluguel de chopeira + cilindro de CO²</p>
-      {opcoes.map(op => (
-        <div key={op.id} onClick={() => setData(d => ({ ...d, chopeira: op.id, tensao: op.id === "gelo" ? null : d.tensao }))}
-          style={{ ...styles.cardSelect, borderColor: data.chopeira === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.chopeira === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
+      {opcoes.map(op => {
+        const opIndisp = op.id === "gelo" ? geloIndisp : eletricaIndisp;
+        return (
+        <div key={op.id} onClick={() => { if (opIndisp) return; setData(d => ({ ...d, chopeira: op.id, tensao: op.id === "gelo" ? null : d.tensao })); }}
+          style={{ ...styles.cardSelect, cursor: opIndisp ? "not-allowed" : "pointer", opacity: opIndisp ? 0.55 : 1, borderColor: data.chopeira === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.chopeira === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <img src={op.img} alt={op.label} style={{ width: 64, height: 64, objectFit: "contain", flexShrink: 0 }} />
+              <img src={op.img} alt={op.label} style={{ width: 64, height: 64, objectFit: "contain", flexShrink: 0, filter: opIndisp ? "grayscale(1)" : "none" }} />
               <div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 700, color: C.cinzaTexto, fontSize: 15 }}>{op.label}</span>
-                  {op.recomendada && <span style={{ fontSize: 9, fontWeight: 800, background: C.verde, color: "#fff", borderRadius: 4, padding: "2px 7px", letterSpacing: 0.5 }}>RECOMENDADA</span>}
+                  {opIndisp
+                    ? <span style={{ fontSize: 9, fontWeight: 800, background: C.cinzaClaro, color: "#fff", borderRadius: 4, padding: "2px 7px", letterSpacing: 0.5 }}>INDISPONÍVEL</span>
+                    : (op.recomendada && <span style={{ fontSize: 9, fontWeight: 800, background: C.verde, color: "#fff", borderRadius: 4, padding: "2px 7px", letterSpacing: 0.5 }}>RECOMENDADA</span>)}
                 </div>
                 <div style={{ fontSize: 12, color: C.cinzaClaro, marginTop: 3 }}>{op.desc}</div>
                 <div style={{ fontSize: 13, color: C.vermelho, marginTop: 4, fontWeight: 700 }}>{formatMoney(op.preco)}</div>
-                {op.aviso && <div style={{ fontSize: 11, color: C.dourado, marginTop: 4, fontWeight: 700 }}>{op.aviso}</div>}
+                {!opIndisp && op.aviso && <div style={{ fontSize: 11, color: C.dourado, marginTop: 4, fontWeight: 700 }}>{op.aviso}</div>}
               </div>
             </div>
             {data.chopeira === op.id && <span style={{ color: C.vermelho, fontSize: 20 }}>✓</span>}
           </div>
         </div>
-      ))}
+        );
+      })}
       {data.chopeira === "eletrica" && (
         <div style={{ marginTop: 8 }}>
           <p style={{ ...styles.label, marginTop: 0 }}>Tensão disponível no local:</p>
           <div style={{ display: "flex", gap: 10 }}>
-            {["110v", "220v"].map(t => (
-              <button key={t} onClick={() => setData(d => ({ ...d, tensao: t }))}
-                style={{ ...styles.litroBtn, flex: 1, background: data.tensao === t ? C.vermelho : "rgba(0,0,0,0.05)", color: data.tensao === t ? "#fff" : C.cinzaTexto, fontWeight: data.tensao === t ? 700 : 500, fontSize: 15 }}>{t.toUpperCase()}</button>
-            ))}
+            {["110v", "220v"].map(t => {
+              const tIndisp = t === "110v" ? v110Indisp : v220Indisp;
+              return (
+              <button key={t} onClick={() => { if (tIndisp) return; setData(d => ({ ...d, tensao: t })); }} disabled={tIndisp}
+                style={{ ...styles.litroBtn, flex: 1, cursor: tIndisp ? "not-allowed" : "pointer", opacity: tIndisp ? 0.5 : 1, textDecoration: tIndisp ? "line-through" : "none", background: data.tensao === t ? C.vermelho : "rgba(0,0,0,0.05)", color: data.tensao === t ? "#fff" : C.cinzaTexto, fontWeight: data.tensao === t ? 700 : 500, fontSize: 15 }}>{t.toUpperCase()}{tIndisp ? " ✕" : ""}</button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1051,10 +1117,10 @@ function App() {
         <div style={styles.content}>
           {stepAtual !== "resumo" && <ProgressBar step={step} total={totalSteps} />}
           {stepAtual === "data" && <StepData data={data} setData={setData} onNext={next} disp={disp} />}
-          {stepAtual === "modalidade" && <StepModalidade data={data} setData={setData} onNext={next} onBack={back} />}
-          {stepAtual === "barris" && <StepBarris data={data} setData={setData} onNext={next} onBack={back} />}
-          {stepAtual === "chopeira" && <StepChopeira data={data} setData={setData} onNext={next} onBack={back} />}
-          {stepAtual === "aluguel" && <StepAluguelChopeira data={data} setData={setData} onNext={next} onBack={back} />}
+          {stepAtual === "modalidade" && <StepModalidade data={data} setData={setData} onNext={next} onBack={back} disp={disp} />}
+          {stepAtual === "barris" && <StepBarris data={data} setData={setData} onNext={next} onBack={back} disp={disp} />}
+          {stepAtual === "chopeira" && <StepChopeira data={data} setData={setData} onNext={next} onBack={back} disp={disp} />}
+          {stepAtual === "aluguel" && <StepAluguelChopeira data={data} setData={setData} onNext={next} onBack={back} disp={disp} />}
           {stepAtual === "evento" && <StepEvento data={data} setData={setData} onNext={next} onBack={back} />}
           {stepAtual === "entrega" && <StepEntrega data={data} setData={setData} onNext={next} onBack={back} />}
           {stepAtual === "contratante" && <StepContratante data={data} setData={setData} onNext={next} onBack={back} />}
