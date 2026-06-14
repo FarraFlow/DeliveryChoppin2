@@ -65,14 +65,28 @@ const ALUGUEL_CHOPEIRA = { gelo: 250, eletrica: 300 };
 const WHATSAPP_NUMBER = "5521993763800";
 const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
+const DISPONIBILIDADE_URL = "https://script.google.com/macros/s/AKfycbwFhijmsXpGfHS3_a2gNOOui74XUEBNjrk0idS7VaZw1k3vN8sYMYBbYamT2oNTjsp8-Q/exec";
 const MODO_TESTE = false;
-const VERSAO = "13/06/2026 às 23:52";
+const VERSAO = "14/06/2026 às 11:51";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
 function formatMoney(v) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
 function hexToRgb(hex) { return parseInt(hex.slice(1,3),16)+","+parseInt(hex.slice(3,5),16)+","+parseInt(hex.slice(5,7),16); }
 function qtdTotalBarris(barris) { return barris.reduce((acc, b) => acc + b.qtd, 0); }
+
+// Normaliza qualquer data vinda da planilha para "YYYY-MM-DD" (comparável a data.data).
+// Aceita "YYYY-MM-DD", "YYYY-MM-DDThh...", "DD/MM/YYYY". Formato desconhecido = devolve cru (não bloqueia por engano).
+function normalizarDataBloqueio(v) {
+  if (v == null) return "";
+  var s = String(v).trim();
+  if (!s) return "";
+  var mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (mIso) return mIso[1] + "-" + mIso[2] + "-" + mIso[3];
+  var mBr = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (mBr) return mBr[3] + "-" + mBr[2] + "-" + mBr[1];
+  return s;
+}
 
 // ajusta preço conforme modalidade
 function precoBarril(precoDelivery, modalidade) {
@@ -477,21 +491,6 @@ function StepEvento({ data, setData, onNext, onBack }) {
   // horário escolhido é válido?
   const horaInvalida = data.hora && eventoHoje && !horariosDisponiveis.includes(data.hora);
 
-  // ao trocar a data, se o horário ficou inválido, limpa
-  function setDataEvento(e) {
-    const novaData = e.target.value;
-    setData(d => {
-      const ehHoje = novaData === hojeStr;
-      let novaHora = d.hora;
-      if (ehHoje && d.hora) {
-        const [hh, mm] = d.hora.split(":").map(Number);
-        const aindaValido = (hh > agora.getHours()) || (hh === agora.getHours() && mm > agora.getMinutes());
-        if (!aindaValido) novaHora = "";
-      }
-      return { ...d, data: novaData, hora: novaData < hojeStr ? "" : novaHora };
-    });
-  }
-
   const ok = data.data && !dataPassada && data.hora && !horaInvalida && data.rua && data.numero && data.bairro && data.cidade && data.uf && data.tipoLocal;
 
   return (
@@ -499,8 +498,10 @@ function StepEvento({ data, setData, onNext, onBack }) {
       <h2 style={styles.stepTitle}>Sobre o Evento 📅</h2>
       <p style={styles.stepSub}>Data, duração e local do evento</p>
       <label style={styles.label}>Data do evento</label>
-      <input type="date" value={data.data || ""} onChange={setDataEvento} style={{ ...styles.input, minHeight: 46, height: 46, lineHeight: "20px", display: "block", WebkitAppearance: "none", appearance: "none", textAlign: "left", textAlignLast: "left" }} min={hojeStr} />
-      {dataPassada && <p style={{ fontSize: 11, color: C.vermelho, marginTop: 4 }}>A data do evento não pode ser anterior a hoje.</p>}
+      <div style={{ ...styles.input, minHeight: 46, height: 46, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.creme, fontWeight: 600 }}>
+        <span>{data.data ? new Date(data.data + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}</span>
+        <span style={{ fontSize: 11, color: C.cinzaClaro, fontWeight: 500 }}>🔒 escolhida no início</span>
+      </div>
       <label style={styles.label}>Horário do evento (início)</label>
       <select value={data.hora || ""} onChange={handle("hora")} style={styles.input} disabled={!data.data || dataPassada}>
         <option value="">Selecione o horário...</option>
@@ -939,6 +940,33 @@ function SectionLabel({ children }) { return <p style={{ fontSize: 10, color: C.
 function Divider() { return <div style={{ height: 1, background: "rgba(0,0,0,0.07)", margin: "12px 0" }} />; }
 
 // ─── Verificação de idade (age gate) ─────────────────────────────────────────
+// ─── STEP: Data do evento (primeiro step) ────────────────────────────────────
+function StepData({ data, setData, onNext, disp }) {
+  const hojeStr = new Date().toISOString().split("T")[0];
+  const diasBloqueados = (disp && disp.diasBloqueados) || [];
+  const dataPassada = data.data && data.data < hojeStr;
+  const dataBloqueada = !!data.data && diasBloqueados.indexOf(data.data) !== -1;
+  const ok = data.data && !dataPassada && !dataBloqueada;
+  function setDataEvento(e) {
+    const novaData = e.target.value;
+    setData(d => ({ ...d, data: novaData }));
+  }
+  return (
+    <div>
+      <h2 style={styles.stepTitle}>Data do Evento 📅</h2>
+      <p style={styles.stepSub}>Para qual dia você quer o chopp?</p>
+      <label style={styles.label}>Data do evento</label>
+      <input type="date" value={data.data || ""} onChange={setDataEvento} style={{ ...styles.input, minHeight: 46, height: 46, lineHeight: "20px", display: "block", WebkitAppearance: "none", appearance: "none", textAlign: "left", textAlignLast: "left" }} min={hojeStr} />
+      {dataPassada && <p style={{ fontSize: 11, color: C.vermelho, marginTop: 6 }}>A data do evento não pode ser anterior a hoje.</p>}
+      {dataBloqueada && <p style={{ fontSize: 12, color: C.vermelho, marginTop: 8, fontWeight: 600 }}>😕 Não estamos atendendo nesta data. Por favor, escolha outro dia.</p>}
+      <div style={{ marginTop: 24 }}>
+        <button onClick={onNext} disabled={!MODO_TESTE && !ok} style={{ ...styles.btnPrimary, opacity: (MODO_TESTE || ok) ? 1 : 0.4 }}>Continuar →</button>
+      </div>
+      <BotaoDuvida />
+    </div>
+  );
+}
+
 function AgeGate({ onConfirm }) {
   const [bloqueado, setBloqueado] = React.useState(false);
   return (
@@ -970,16 +998,37 @@ function App() {
   const [maiorIdade, setMaiorIdade] = React.useState(false);
   const [step, setStep] = React.useState(0);
   const [data, setData] = React.useState({});
+  const [disp, setDisp] = React.useState(null);
+  const [dispCarregada, setDispCarregada] = React.useState(false);
+
+  // Busca a disponibilidade UMA vez, após o age gate. Falha => tudo disponível (não perde venda).
+  React.useEffect(function () {
+    if (!maiorIdade || dispCarregada) return;
+    fetch(DISPONIBILIDADE_URL)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        setDisp({
+          indisponiveis: (j && j.indisponiveis) || [],
+          entregasBloqueadas: ((j && j.datas && j.datas.entregasBloqueadas) || []).map(normalizarDataBloqueio),
+          diasBloqueados: ((j && j.datas && j.datas.diasBloqueados) || []).map(normalizarDataBloqueio)
+        });
+        setDispCarregada(true);
+      })
+      .catch(function () {
+        setDisp({ indisponiveis: [], entregasBloqueadas: [], diasBloqueados: [] });
+        setDispCarregada(true);
+      });
+  }, [maiorIdade, dispCarregada]);
 
   if (!maiorIdade) return <AgeGate onConfirm={() => setMaiorIdade(true)} />;
 
   // monta a sequência de steps conforme a modalidade
   function getFluxo() {
     const m = data.modalidade;
-    if (m === "delivery") return ["modalidade", "barris", "chopeira", "evento", "entrega", "contratante", "pagamento", "resumo"];
-    if (m === "so-barril") return ["modalidade", "barris", "evento", "entrega", "contratante", "pagamento", "resumo"];
-    if (m === "so-chopeira") return ["modalidade", "aluguel", "evento", "entrega", "contratante", "pagamento", "resumo"];
-    return ["modalidade"];
+    if (m === "delivery") return ["data", "modalidade", "barris", "chopeira", "evento", "entrega", "contratante", "pagamento", "resumo"];
+    if (m === "so-barril") return ["data", "modalidade", "barris", "evento", "entrega", "contratante", "pagamento", "resumo"];
+    if (m === "so-chopeira") return ["data", "modalidade", "aluguel", "evento", "entrega", "contratante", "pagamento", "resumo"];
+    return ["data", "modalidade"];
   }
   const fluxo = getFluxo();
   const stepAtual = fluxo[step] || "modalidade";
@@ -994,6 +1043,7 @@ function App() {
         <div style={styles.header}><img src={LOGO} alt="Chopp In" style={styles.logoImg} /></div>
         <div style={styles.content}>
           {stepAtual !== "resumo" && <ProgressBar step={step} total={totalSteps} />}
+          {stepAtual === "data" && <StepData data={data} setData={setData} onNext={next} disp={disp} />}
           {stepAtual === "modalidade" && <StepModalidade data={data} setData={setData} onNext={next} />}
           {stepAtual === "barris" && <StepBarris data={data} setData={setData} onNext={next} onBack={back} />}
           {stepAtual === "chopeira" && <StepChopeira data={data} setData={setData} onNext={next} onBack={back} />}
