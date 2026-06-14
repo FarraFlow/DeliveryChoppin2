@@ -67,7 +67,7 @@ const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const DISPONIBILIDADE_URL = "https://script.google.com/macros/s/AKfycbwFhijmsXpGfHS3_a2gNOOui74XUEBNjrk0idS7VaZw1k3vN8sYMYBbYamT2oNTjsp8-Q/exec";
 const MODO_TESTE = false;
-const VERSAO = "14/06/2026 às 18:38";
+const VERSAO = "14/06/2026 às 19:31";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -672,35 +672,34 @@ function StepEvento({ data, setData, onNext, onBack }) {
 // ─── STEP: Entrega e Recolha ─────────────────────────────────────────────────
 function StepEntrega({ data, setData, onNext, onBack, disp }) {
   const handle = field => e => setData(d => ({ ...d, [field]: e.target.value }));
-  const entregaBloqueada = !!(disp && disp.entregasBloqueadas && data.data && disp.entregasBloqueadas.indexOf(data.data) !== -1);
+  const rotasCheias = !!(disp && disp.entregasBloqueadas && data.data && disp.entregasBloqueadas.indexOf(data.data) !== -1);
   const opcoes = [
-    { id: "retirada", label: "Retirada na sede", icon: "🏪", semRota: true, texto: "Você retira o pedido na nossa sede (Andaraí). O horário será combinado pelo WhatsApp com a confirmação do pedido." },
-    { id: "compartilhada", label: "Compartilhada", icon: "🔄", badge: "Incluso", badgeColor: C.verde, texto: "São realizadas no dia do evento junto com outras entregas/recolhas, com as rotas se iniciando às 8h da manhã até 1h antes do evento começar." },
+    { id: "retirada", label: "Retirada na sede", icon: "🏪", texto: "Você retira o pedido na nossa sede (Andaraí). O horário será combinado pelo WhatsApp com a confirmação do pedido." },
+    { id: "compartilhada", label: "Compartilhada", icon: "🔄", badge: rotasCheias ? "Antecipada" : "Incluso", badgeColor: rotasCheias ? C.dourado : C.verde, texto: rotasCheias
+        ? "As rotas do dia do evento já estão cheias, mas podemos antecipar sua entrega (ex.: na véspera), em comum acordo e sem custo adicional. O dia será combinado conforme disponibilidade pelo WhatsApp na confirmação do pedido."
+        : "São realizadas no dia do evento junto com outras entregas/recolhas, com as rotas se iniciando às 8h da manhã até 1h antes do evento começar." },
     { id: "dedicada", label: "Dedicada", icon: "🎯", badge: "+ " + formatMoney(CUSTO_DEDICADA_UNICA), badgeColor: C.dourado, texto: "São realizadas no horário combinado, no valor de R$ 200 para entrega e R$ 200 para recolha. Caso queira ambas dedicadas, o valor total fica R$ 300." },
   ];
   const sel = data.entrega;
   const dedicada = sel === "dedicada";
   const ok = sel && (!dedicada || data.horaEntrega);
-  function pick(id) { setData(d => ({ ...d, entrega: id, ...(id === "dedicada" ? {} : { horaEntrega: undefined }) })); }
+  function pick(id) { setData(d => ({ ...d, entrega: id, entregaAntecipada: (id === "compartilhada" && rotasCheias) ? true : undefined, ...(id === "dedicada" ? {} : { horaEntrega: undefined }) })); }
   return (
     <div>
       <h2 style={styles.stepTitle}>Entrega 🚚</h2>
       <p style={styles.stepSub}>Como você quer receber o pedido no dia do evento?</p>
       {opcoes.map(op => {
         const selected = sel === op.id;
-        const bloqueado = entregaBloqueada && !op.semRota;
         return (
-          <div key={op.id} onClick={() => { if (bloqueado) return; pick(op.id); }}
-            style={{ ...styles.cardSelect, padding: "12px 14px", cursor: bloqueado ? "not-allowed" : "pointer", opacity: bloqueado ? 0.55 : 1, borderColor: selected ? C.vermelho : "rgba(0,0,0,0.08)", background: selected ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
+          <div key={op.id} onClick={() => pick(op.id)}
+            style={{ ...styles.cardSelect, padding: "12px 14px", cursor: "pointer", borderColor: selected ? C.vermelho : "rgba(0,0,0,0.08)", background: selected ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 24, lineHeight: 1 }}>{op.icon}</span>
                 <div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 700, color: C.cinzaTexto, fontSize: 14 }}>{op.label}</span>
-                    {bloqueado
-                      ? <span style={{ fontSize: 9, fontWeight: 800, background: C.vermelho, color: "#fff", borderRadius: 4, padding: "2px 6px", letterSpacing: 0.5 }}>INDISPONÍVEL</span>
-                      : (op.badge && <span style={{ fontSize: 9, fontWeight: 800, background: op.badgeColor, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>{op.badge}</span>)}
+                    {op.badge && <span style={{ fontSize: 9, fontWeight: 800, background: op.badgeColor, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>{op.badge}</span>}
                   </div>
                   <div style={{ fontSize: 12, color: C.cinzaClaro, marginTop: 3, lineHeight: 1.45 }}>{op.texto}</div>
                 </div>
@@ -731,9 +730,8 @@ function StepEntrega({ data, setData, onNext, onBack, disp }) {
 // ─── STEP: Recolha / Devolução ───────────────────────────────────────────────
 function StepRecolha({ data, setData, onNext, onBack, disp }) {
   const handle = field => e => setData(d => ({ ...d, [field]: e.target.value }));
-  const entregaBloqueada = !!(disp && disp.entregasBloqueadas && data.data && disp.entregasBloqueadas.indexOf(data.data) !== -1);
   const opcoes = [
-    { id: "devolucao", label: "Devolução na sede", icon: "🏪", semRota: true, texto: "Você devolve o barril e/ou equipamentos na nossa sede (Andaraí). O horário será combinado pelo WhatsApp com a confirmação do pedido." },
+    { id: "devolucao", label: "Devolução na sede", icon: "🏪", texto: "Você devolve o barril e/ou equipamentos na nossa sede (Andaraí). O horário será combinado pelo WhatsApp com a confirmação do pedido." },
     { id: "compartilhada", label: "Compartilhada", icon: "🔄", badge: "Incluso", badgeColor: C.verde, texto: "São realizadas junto com outras entregas/recolhas no dia seguinte ao evento, com as rotas se iniciando às 8h da manhã." },
     { id: "dedicada", label: "Dedicada", icon: "🎯", badge: "+ " + formatMoney(CUSTO_DEDICADA_UNICA), badgeColor: C.dourado, texto: "São realizadas no horário combinado, no valor de R$ 200 para entrega e R$ 200 para recolha. Caso queira ambas dedicadas, o valor total fica R$ 300." },
   ];
@@ -747,19 +745,16 @@ function StepRecolha({ data, setData, onNext, onBack, disp }) {
       <p style={styles.stepSub}>Como o barril e os equipamentos voltam para nós?</p>
       {opcoes.map(op => {
         const selected = sel === op.id;
-        const bloqueado = entregaBloqueada && !op.semRota;
         return (
-          <div key={op.id} onClick={() => { if (bloqueado) return; pick(op.id); }}
-            style={{ ...styles.cardSelect, padding: "12px 14px", cursor: bloqueado ? "not-allowed" : "pointer", opacity: bloqueado ? 0.55 : 1, borderColor: selected ? C.vermelho : "rgba(0,0,0,0.08)", background: selected ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
+          <div key={op.id} onClick={() => pick(op.id)}
+            style={{ ...styles.cardSelect, padding: "12px 14px", cursor: "pointer", borderColor: selected ? C.vermelho : "rgba(0,0,0,0.08)", background: selected ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 24, lineHeight: 1 }}>{op.icon}</span>
                 <div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 700, color: C.cinzaTexto, fontSize: 14 }}>{op.label}</span>
-                    {bloqueado
-                      ? <span style={{ fontSize: 9, fontWeight: 800, background: C.vermelho, color: "#fff", borderRadius: 4, padding: "2px 6px", letterSpacing: 0.5 }}>INDISPONÍVEL</span>
-                      : (op.badge && <span style={{ fontSize: 9, fontWeight: 800, background: op.badgeColor, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>{op.badge}</span>)}
+                    {op.badge && <span style={{ fontSize: 9, fontWeight: 800, background: op.badgeColor, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>{op.badge}</span>}
                   </div>
                   <div style={{ fontSize: 12, color: C.cinzaClaro, marginTop: 3, lineHeight: 1.45 }}>{op.texto}</div>
                 </div>
@@ -934,7 +929,7 @@ function StepResumo({ data, onBack }) {
   if (data.entrega === "retirada") {
     msgBody += "Entrega: RETIRADA NA SEDE (Andarai) - horario a combinar\n";
   } else {
-    msgBody += "Entrega: " + (data.entrega === "dedicada" ? "Dedicada as " + data.horaEntrega + "h" : "Compartilhada") + "\n";
+    msgBody += "Entrega: " + (data.entrega === "dedicada" ? "Dedicada as " + data.horaEntrega + "h" : ("Compartilhada" + (data.entregaAntecipada ? " - ANTECIPADA A COMBINAR (rotas cheias no dia)" : ""))) + "\n";
   }
   if (data.recolha === "devolucao") {
     msgBody += "Recolha: DEVOLUCAO NA SEDE (Andarai) - horario a combinar\n";
@@ -968,7 +963,7 @@ function StepResumo({ data, onBack }) {
         pagamento: pagamentoTxt,
         endereco: (data.rua||"") + (data.numero ? ", " + data.numero : "") + " - " + (data.bairro||"") + " - " + cidadeUf,
         dataEvento: dataEvento,
-        observacoes: (data.entrega === "retirada" ? "[RETIRADA NA SEDE] " : "") + (data.recolha === "devolucao" ? "[DEVOLUÇÃO NA SEDE] " : "") + (data.obsInstalacao || "")
+        observacoes: (data.entrega === "retirada" ? "[RETIRADA NA SEDE] " : "") + (data.entregaAntecipada ? "[ENTREGA ANTECIPADA - ROTAS CHEIAS] " : "") + (data.recolha === "devolucao" ? "[DEVOLUÇÃO NA SEDE] " : "") + (data.obsInstalacao || "")
       };
       fetch(PLANILHA_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
     } catch (e) { /* nao bloqueia o pedido se a planilha falhar */ }
@@ -1023,7 +1018,7 @@ function StepResumo({ data, onBack }) {
         <Row label="Data" value={dataEvento} />
         <Row label="Horário" value={data.hora + "h"} />
         <Row label="Diárias" value={t.numDiarias + " " + (t.numDiarias === 1 ? "diária" : "diárias")} />
-        <Row label="🚚 Entrega" value={data.entrega === "retirada" ? "Retirada na sede (Andaraí)" : (data.entrega === "dedicada" ? "Dedicada (" + data.horaEntrega + "h)" : "Compartilhada")} />
+        <Row label="🚚 Entrega" value={data.entrega === "retirada" ? "Retirada na sede (Andaraí)" : (data.entrega === "dedicada" ? "Dedicada (" + data.horaEntrega + "h)" : ("Compartilhada" + (data.entregaAntecipada ? " — antecipada a combinar" : "")))} />
         <Row label={<span><span style={{ display: "inline-block", transform: "scaleX(-1)" }}>🚚</span> Recolha</span>} value={data.recolha === "devolucao" ? "Devolução na sede (Andaraí)" : ((data.recolha === "dedicada" ? "Dedicada (" + data.horaRecolha + "h)" : "Compartilhada") + " — " + dataRecolha)} />
 
         <Divider />
@@ -1092,7 +1087,7 @@ function StepData({ data, setData, onNext, disp }) {
       {dataPassada && <p style={{ fontSize: 11, color: C.vermelho, marginTop: 6 }}>A data do evento não pode ser anterior a hoje.</p>}
       {dataBloqueada && <p style={{ fontSize: 12, color: C.vermelho, marginTop: 8, fontWeight: 600 }}>😕 Não estamos atendendo nesta data. Por favor, escolha outro dia.</p>}
       {soRetirada && <div style={{ background: C.creme, border: "1.5px solid "+C.dourado+"55", borderRadius: 10, padding: "10px 14px", marginTop: 10 }}>
-        <p style={{ fontSize: 12.5, color: C.cinzaTexto, fontWeight: 600, margin: 0 }}>😞 Não temos mais disponibilidade de entrega nesta data. Apenas para retirada em nossa sede (Andaraí) caso tenha interesse.</p>
+        <p style={{ fontSize: 12.5, color: C.cinzaTexto, fontWeight: 600, margin: 0 }}>🚚 As rotas de entrega deste dia já estão cheias, mas conseguimos combinar uma entrega antecipada (ex.: na véspera), sem custo adicional. Você escolhe como prefere no passo de entrega.</p>
       </div>}
       <div style={{ marginTop: 24 }}>
         <button onClick={onNext} disabled={!MODO_TESTE && !ok} style={{ ...styles.btnPrimary, opacity: (MODO_TESTE || ok) ? 1 : 0.4 }}>Continuar →</button>
