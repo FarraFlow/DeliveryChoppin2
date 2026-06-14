@@ -67,7 +67,7 @@ const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const DISPONIBILIDADE_URL = "https://script.google.com/macros/s/AKfycbwFhijmsXpGfHS3_a2gNOOui74XUEBNjrk0idS7VaZw1k3vN8sYMYBbYamT2oNTjsp8-Q/exec";
 const MODO_TESTE = false;
-const VERSAO = "14/06/2026 às 19:31";
+const VERSAO = "14/06/2026 às 20:32";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -107,6 +107,19 @@ function itemIndisponivel(disp, dataEscolhida, produto, tamanho) {
     if (temTamanho && normTam(it.barril) !== normTam(tamanho)) return false;
     return normalizarDataBloqueio(it.data) === dataEscolhida;
   });
+}
+
+// Todos os barris (todos os produtos e tamanhos) indisponíveis na data?
+function todosBarrisIndisp(disp, dataEscolhida) {
+  if (!dataEscolhida) return false;
+  return CHOPPS.every(function (c) { return c.opcoes.every(function (op) { return itemIndisponivel(disp, dataEscolhida, c.nome, op.litros + "L"); }); });
+}
+// Todas as chopeiras (gelo + 110v + 220v) indisponíveis na data?
+function todasChopeirasIndisp(disp, dataEscolhida) {
+  if (!dataEscolhida) return false;
+  return itemIndisponivel(disp, dataEscolhida, "Chopeira a Gelo", "")
+    && itemIndisponivel(disp, dataEscolhida, "Chopeira Elétrica 110v", "")
+    && itemIndisponivel(disp, dataEscolhida, "Chopeira Elétrica 220v", "");
 }
 
 // ajusta preço conforme modalidade
@@ -203,11 +216,9 @@ function ProgressBar({ step, total }) {
 
 // ─── STEP 0: Escolha da modalidade ───────────────────────────────────────────
 function StepModalidade({ data, setData, onNext, onBack, disp }) {
-  // Sem nenhuma chopeira disponível na data => Delivery e Aluguel indisponíveis (só "Somente Barril").
-  const semChopeira =
-    itemIndisponivel(disp, data.data, "Chopeira a Gelo", "") &&
-    itemIndisponivel(disp, data.data, "Chopeira Elétrica 110v", "") &&
-    itemIndisponivel(disp, data.data, "Chopeira Elétrica 220v", "");
+  // Cada modalidade depende do que ela usa: Delivery (barril+chopeira), Somente Barril (barril), Aluguel (chopeira).
+  const semChopeira = todasChopeirasIndisp(disp, data.data);
+  const semBarris = todosBarrisIndisp(disp, data.data);
   const opcoes = [
     { id: "delivery", titulo: "Delivery Completo", imgs: [{ src: IMG_CHOPEIRA_GELO, h: 38 }, { src: IMG_BARRIL_CHOPPIN, h: 50 }], desc: "Barril + chopeira + cilindro de CO² + copos plásticos de brinde. Tudo pronto para o seu evento." },
     { id: "so-barril", titulo: "Somente Barril", imgs: [{ src: IMG_BARRIL_CHOPPIN, h: 56 }], desc: "Para quem já tem chopeira. Inclui apenas o barril (não acompanha chopeira, cilindro de CO² nem copos)." },
@@ -218,7 +229,9 @@ function StepModalidade({ data, setData, onNext, onBack, disp }) {
       <h2 style={styles.stepTitle}>O que você precisa?</h2>
       <p style={styles.stepSub}>Escolha a modalidade do seu pedido</p>
       {opcoes.map(op => {
-        const indisp = semChopeira && (op.id === "delivery" || op.id === "so-chopeira");
+        const indisp = (op.id === "delivery" && (semChopeira || semBarris))
+          || (op.id === "so-chopeira" && semChopeira)
+          || (op.id === "so-barril" && semBarris);
         return (
         <div key={op.id} onClick={() => { if (indisp) return; setData(d => d.modalidade === op.id ? d : { data: d.data, modalidade: op.id }); }}
           style={{ ...styles.cardSelect, cursor: indisp ? "not-allowed" : "pointer", opacity: indisp ? 0.55 : 1, borderColor: data.modalidade === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.modalidade === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
@@ -674,11 +687,11 @@ function StepEntrega({ data, setData, onNext, onBack, disp }) {
   const handle = field => e => setData(d => ({ ...d, [field]: e.target.value }));
   const rotasCheias = !!(disp && disp.entregasBloqueadas && data.data && disp.entregasBloqueadas.indexOf(data.data) !== -1);
   const opcoes = [
-    { id: "retirada", label: "Retirada na sede", icon: "🏪", texto: "Você retira o pedido na nossa sede (Andaraí). O horário será combinado pelo WhatsApp com a confirmação do pedido." },
+    { id: "retirada", label: "Retirada na sede", icon: "🏪", texto: "Você retira o pedido na nossa sede (Andaraí). Dia e horário serão combinados pelo WhatsApp na confirmação do pedido." },
     { id: "compartilhada", label: "Compartilhada", icon: "🔄", badge: rotasCheias ? "Antecipada" : "Incluso", badgeColor: rotasCheias ? C.dourado : C.verde, texto: rotasCheias
         ? "As rotas do dia do evento já estão cheias, mas podemos antecipar sua entrega (ex.: na véspera), em comum acordo e sem custo adicional. O dia será combinado conforme disponibilidade pelo WhatsApp na confirmação do pedido."
-        : "São realizadas no dia do evento junto com outras entregas/recolhas, com as rotas se iniciando às 8h da manhã até 1h antes do evento começar." },
-    { id: "dedicada", label: "Dedicada", icon: "🎯", badge: "+ " + formatMoney(CUSTO_DEDICADA_UNICA), badgeColor: C.dourado, texto: "São realizadas no horário combinado, no valor de R$ 200 para entrega e R$ 200 para recolha. Caso queira ambas dedicadas, o valor total fica R$ 300." },
+        : "É realizada no dia do evento junto com outras entregas/recolhas, com as rotas se iniciando às 8h da manhã até 1h antes do evento começar." },
+    { id: "dedicada", label: "Dedicada", icon: "🎯", badge: "+ " + formatMoney(CUSTO_DEDICADA_UNICA), badgeColor: C.dourado, texto: "É realizada no horário combinado, no valor de R$ 200 para entrega e R$ 200 para recolha. Caso queira ambas dedicadas, o valor total fica R$ 300." },
   ];
   const sel = data.entrega;
   const dedicada = sel === "dedicada";
@@ -686,8 +699,8 @@ function StepEntrega({ data, setData, onNext, onBack, disp }) {
   function pick(id) { setData(d => ({ ...d, entrega: id, entregaAntecipada: (id === "compartilhada" && rotasCheias) ? true : undefined, ...(id === "dedicada" ? {} : { horaEntrega: undefined }) })); }
   return (
     <div>
-      <h2 style={styles.stepTitle}>Entrega 🚚</h2>
-      <p style={styles.stepSub}>Como você quer receber o pedido no dia do evento?</p>
+      <h2 style={styles.stepTitle}>Entrega / Retirada 🚚</h2>
+      <p style={styles.stepSub}>Como você receberá o seu pedido?</p>
       {opcoes.map(op => {
         const selected = sel === op.id;
         return (
@@ -731,9 +744,9 @@ function StepEntrega({ data, setData, onNext, onBack, disp }) {
 function StepRecolha({ data, setData, onNext, onBack, disp }) {
   const handle = field => e => setData(d => ({ ...d, [field]: e.target.value }));
   const opcoes = [
-    { id: "devolucao", label: "Devolução na sede", icon: "🏪", texto: "Você devolve o barril e/ou equipamentos na nossa sede (Andaraí). O horário será combinado pelo WhatsApp com a confirmação do pedido." },
-    { id: "compartilhada", label: "Compartilhada", icon: "🔄", badge: "Incluso", badgeColor: C.verde, texto: "São realizadas junto com outras entregas/recolhas no dia seguinte ao evento, com as rotas se iniciando às 8h da manhã." },
-    { id: "dedicada", label: "Dedicada", icon: "🎯", badge: "+ " + formatMoney(CUSTO_DEDICADA_UNICA), badgeColor: C.dourado, texto: "São realizadas no horário combinado, no valor de R$ 200 para entrega e R$ 200 para recolha. Caso queira ambas dedicadas, o valor total fica R$ 300." },
+    { id: "devolucao", label: "Devolução na sede", icon: "🏪", texto: "Você devolve o barril e/ou equipamentos na nossa sede (Andaraí). Dia e horário serão combinados pelo WhatsApp na confirmação do pedido." },
+    { id: "compartilhada", label: "Compartilhada", icon: "🔄", badge: "Incluso", badgeColor: C.verde, texto: "É realizada junto com outras entregas/recolhas no dia seguinte ao evento, com as rotas se iniciando às 8h da manhã." },
+    { id: "dedicada", label: "Dedicada", icon: "🎯", badge: "+ " + formatMoney(CUSTO_DEDICADA_UNICA), badgeColor: C.dourado, texto: "É realizada no horário combinado, no valor de R$ 200 para entrega e R$ 200 para recolha. Caso queira ambas dedicadas, o valor total fica R$ 300." },
   ];
   const sel = data.recolha;
   const dedicada = sel === "dedicada";
@@ -1048,7 +1061,7 @@ function StepResumo({ data, onBack }) {
         <span style={{ fontSize: 22 }}>💬</span> Confirmar no WhatsApp
       </button>
       <button onClick={onBack} style={{ ...styles.btnSecondary, marginTop: 16 }}>← Editar pedido</button>
-      <p style={{ fontSize: 11, color: C.cinzaClaro, textAlign: "center", marginTop: 16 }}>Você será redirecionado ao WhatsApp. O pagamento é combinado diretamente com nossa equipe.</p>
+      <p style={{ fontSize: 11, color: C.cinzaClaro, textAlign: "center", marginTop: 16 }}>Você será redirecionado ao WhatsApp. O pagamento será realizado diretamente com nossa equipe.</p>
     </div>
   );
 }
@@ -1072,8 +1085,10 @@ function StepData({ data, setData, onNext, disp }) {
   const entregasBloqueadas = (disp && disp.entregasBloqueadas) || [];
   const dataPassada = data.data && data.data < hojeStr;
   const dataBloqueada = !!data.data && diasBloqueados.indexOf(data.data) !== -1;
-  const soRetirada = !!data.data && !dataBloqueada && entregasBloqueadas.indexOf(data.data) !== -1;
-  const ok = data.data && !dataPassada && !dataBloqueada;
+  const tudoEsgotado = todosBarrisIndisp(disp, data.data) && todasChopeirasIndisp(disp, data.data);
+  const semDisponibilidade = dataBloqueada || tudoEsgotado;
+  const soRetirada = !!data.data && !semDisponibilidade && entregasBloqueadas.indexOf(data.data) !== -1;
+  const ok = data.data && !dataPassada && !semDisponibilidade;
   function setDataEvento(e) {
     const novaData = e.target.value;
     setData(d => ({ ...d, data: novaData }));
@@ -1085,7 +1100,7 @@ function StepData({ data, setData, onNext, disp }) {
       <label style={styles.label}>Data do evento</label>
       <input type="date" value={data.data || ""} onChange={setDataEvento} style={{ ...styles.input, minHeight: 46, height: 46, lineHeight: "20px", display: "block", WebkitAppearance: "none", appearance: "none", textAlign: "left", textAlignLast: "left" }} min={hojeStr} />
       {dataPassada && <p style={{ fontSize: 11, color: C.vermelho, marginTop: 6 }}>A data do evento não pode ser anterior a hoje.</p>}
-      {dataBloqueada && <p style={{ fontSize: 12, color: C.vermelho, marginTop: 8, fontWeight: 600 }}>😕 Não estamos atendendo nesta data. Por favor, escolha outro dia.</p>}
+      {semDisponibilidade && <p style={{ fontSize: 12, color: C.vermelho, marginTop: 8, fontWeight: 600 }}>😕 Não temos mais disponibilidade para este dia. Por favor, escolha outro dia.</p>}
       {soRetirada && <div style={{ background: C.creme, border: "1.5px solid "+C.dourado+"55", borderRadius: 10, padding: "10px 14px", marginTop: 10 }}>
         <p style={{ fontSize: 12.5, color: C.cinzaTexto, fontWeight: 600, margin: 0 }}>🚚 As rotas de entrega deste dia já estão cheias, mas conseguimos combinar uma entrega antecipada (ex.: na véspera), sem custo adicional. Você escolhe como prefere no passo de entrega.</p>
       </div>}
