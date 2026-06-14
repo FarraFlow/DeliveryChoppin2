@@ -67,7 +67,7 @@ const WHATSAPP_DUVIDAS = "5521993763800";
 const PARCELA_MINIMA = 200;
 const DISPONIBILIDADE_URL = "https://script.google.com/macros/s/AKfycbwFhijmsXpGfHS3_a2gNOOui74XUEBNjrk0idS7VaZw1k3vN8sYMYBbYamT2oNTjsp8-Q/exec";
 const MODO_TESTE = false;
-const VERSAO = "14/06/2026 às 11:51";
+const VERSAO = "14/06/2026 às 12:30";
 
 const C = { vermelho: "#D6202A", dourado: "#F5A623", creme: "#FFFDF8", cinzaTexto: "#3A3A3A", cinzaClaro: "#8A8A8A", verde: "#2E9E5B" };
 
@@ -76,13 +76,17 @@ function hexToRgb(hex) { return parseInt(hex.slice(1,3),16)+","+parseInt(hex.sli
 function qtdTotalBarris(barris) { return barris.reduce((acc, b) => acc + b.qtd, 0); }
 
 // Normaliza qualquer data vinda da planilha para "YYYY-MM-DD" (comparável a data.data).
-// Aceita "YYYY-MM-DD", "YYYY-MM-DDThh...", "DD/MM/YYYY". Formato desconhecido = devolve cru (não bloqueia por engano).
+// Aceita "YYYY-MM-DD", "YYYY-MM-DDThh...", Date.toString JS ("Wed Jun 17 2026 ..."), "DD/MM/YYYY".
+// Formato desconhecido = devolve cru (não bloqueia por engano).
 function normalizarDataBloqueio(v) {
   if (v == null) return "";
   var s = String(v).trim();
   if (!s) return "";
   var mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (mIso) return mIso[1] + "-" + mIso[2] + "-" + mIso[3];
+  var MESES = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
+  var mTxt = s.match(/^[A-Za-z]{3}\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})/);
+  if (mTxt && MESES[mTxt[1]]) return mTxt[3] + "-" + MESES[mTxt[1]] + "-" + ("0" + mTxt[2]).slice(-2);
   var mBr = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   if (mBr) return mBr[3] + "-" + mBr[2] + "-" + mBr[1];
   return s;
@@ -181,7 +185,7 @@ function ProgressBar({ step, total }) {
 }
 
 // ─── STEP 0: Escolha da modalidade ───────────────────────────────────────────
-function StepModalidade({ data, setData, onNext }) {
+function StepModalidade({ data, setData, onNext, onBack }) {
   const opcoes = [
     { id: "delivery", titulo: "Delivery Completo", imgs: [{ src: IMG_CHOPEIRA_GELO, h: 38 }, { src: IMG_BARRIL_CHOPPIN, h: 50 }], desc: "Barril + chopeira + cilindro de CO² + copos plásticos de brinde. Tudo pronto para o seu evento." },
     { id: "so-barril", titulo: "Somente Barril", imgs: [{ src: IMG_BARRIL_CHOPPIN, h: 56 }], desc: "Para quem já tem chopeira. Inclui apenas o barril (não acompanha chopeira, cilindro de CO² nem copos)." },
@@ -192,7 +196,7 @@ function StepModalidade({ data, setData, onNext }) {
       <h2 style={styles.stepTitle}>O que você precisa?</h2>
       <p style={styles.stepSub}>Escolha a modalidade do seu pedido</p>
       {opcoes.map(op => (
-        <div key={op.id} onClick={() => { setData(d => d.modalidade === op.id ? d : { modalidade: op.id }); }}
+        <div key={op.id} onClick={() => { setData(d => d.modalidade === op.id ? d : { data: d.data, modalidade: op.id }); }}
           style={{ ...styles.cardSelect, borderColor: data.modalidade === op.id ? C.vermelho : "rgba(0,0,0,0.08)", background: data.modalidade === op.id ? "rgba("+hexToRgb(C.vermelho)+",0.05)" : "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -208,7 +212,10 @@ function StepModalidade({ data, setData, onNext }) {
           </div>
         </div>
       ))}
-      <button onClick={onNext} disabled={!MODO_TESTE && !data.modalidade} style={{ ...styles.btnPrimary, marginTop: 20, opacity: (MODO_TESTE || data.modalidade) ? 1 : 0.4 }}>Continuar →</button>
+      <div style={styles.btnRow}>
+        <button onClick={onBack} style={styles.btnSecondary}>← Voltar</button>
+        <button onClick={onNext} disabled={!MODO_TESTE && !data.modalidade} style={{ ...styles.btnPrimary, opacity: (MODO_TESTE || data.modalidade) ? 1 : 0.4 }}>Continuar →</button>
+      </div>
       <BotaoDuvida />
     </div>
   );
@@ -1044,7 +1051,7 @@ function App() {
         <div style={styles.content}>
           {stepAtual !== "resumo" && <ProgressBar step={step} total={totalSteps} />}
           {stepAtual === "data" && <StepData data={data} setData={setData} onNext={next} disp={disp} />}
-          {stepAtual === "modalidade" && <StepModalidade data={data} setData={setData} onNext={next} />}
+          {stepAtual === "modalidade" && <StepModalidade data={data} setData={setData} onNext={next} onBack={back} />}
           {stepAtual === "barris" && <StepBarris data={data} setData={setData} onNext={next} onBack={back} />}
           {stepAtual === "chopeira" && <StepChopeira data={data} setData={setData} onNext={next} onBack={back} />}
           {stepAtual === "aluguel" && <StepAluguelChopeira data={data} setData={setData} onNext={next} onBack={back} />}
